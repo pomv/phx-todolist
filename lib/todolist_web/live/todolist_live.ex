@@ -1,10 +1,16 @@
 defmodule TodolistWeb.TodoLive do
   use TodolistWeb, :live_view
 
+  @todos_topic "todos"
+
   alias Todolist.Todos
   alias Todolist.Todos.Todo
 
   def mount(_params, _session, socket) do
+    if connected?(socket) do
+      Phoenix.PubSub.subscribe(Todolist.PubSub, @todos_topic)
+    end
+
     {:ok,
      socket
      |> assign(:page_title, "Todos")
@@ -15,6 +21,8 @@ defmodule TodolistWeb.TodoLive do
   def handle_event("save", %{"todo" => todo_params}, socket) do
     case Todos.create_todo(todo_params) do
       {:ok, _todo} ->
+        broadcast_todos_changed()
+
         {:noreply,
          socket
          |> assign(:todos, Todos.list_todos())
@@ -30,6 +38,7 @@ defmodule TodolistWeb.TodoLive do
 
     if todo do
       {:ok, _todo} = Todos.update_todo(todo, %{done: !todo.done})
+      broadcast_todos_changed()
       {:noreply, assign(socket, :todos, Todos.list_todos())}
     else
       {:noreply, socket}
@@ -41,10 +50,19 @@ defmodule TodolistWeb.TodoLive do
 
     if todo do
       {:ok, _todo} = Todos.delete_todo(todo)
+      broadcast_todos_changed()
       {:noreply, assign(socket, :todos, Todos.list_todos())}
     else
       {:noreply, socket}
     end
+  end
+
+  def handle_info(:todos_changed, socket) do
+    {:noreply, assign(socket, :todos, Todos.list_todos())}
+  end
+
+  defp broadcast_todos_changed do
+    Phoenix.PubSub.broadcast(Todolist.PubSub, @todos_topic, :todos_changed)
   end
 
   def render(assigns) do
