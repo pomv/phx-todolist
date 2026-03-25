@@ -20,12 +20,12 @@ defmodule TodolistWeb.TodoLive do
 
   def handle_event("save", %{"todo" => todo_params}, socket) do
     case Todos.create_todo(todo_params) do
-      {:ok, _todo} ->
+      {:ok, todo} ->
         broadcast_todos_changed()
 
         {:noreply,
          socket
-         |> assign(:todos, Todos.list_todos())
+         |> assign(:todos, [todo | socket.assigns.todos])
          |> assign(:form, to_form(Todos.change_todo(%Todo{})))}
 
       {:error, %Ecto.Changeset{} = changeset} ->
@@ -37,9 +37,10 @@ defmodule TodolistWeb.TodoLive do
     todo = Enum.find(socket.assigns.todos, &(to_string(&1.id) == id))
 
     if todo do
-      {:ok, _todo} = Todos.update_todo(todo, %{done: !todo.done})
+      {:ok, updated_todo} = Todos.update_todo(todo, %{done: !todo.done})
       broadcast_todos_changed()
-      {:noreply, assign(socket, :todos, Todos.list_todos())}
+
+      {:noreply, assign(socket, :todos, replace_todo(socket.assigns.todos, updated_todo))}
     else
       {:noreply, socket}
     end
@@ -49,9 +50,11 @@ defmodule TodolistWeb.TodoLive do
     todo = Enum.find(socket.assigns.todos, &(to_string(&1.id) == id))
 
     if todo do
-      {:ok, _todo} = Todos.delete_todo(todo)
+      {:ok, deleted_todo} = Todos.delete_todo(todo)
       broadcast_todos_changed()
-      {:noreply, assign(socket, :todos, Todos.list_todos())}
+
+      {:noreply,
+       assign(socket, :todos, Enum.reject(socket.assigns.todos, &(&1.id == deleted_todo.id)))}
     else
       {:noreply, socket}
     end
@@ -61,8 +64,14 @@ defmodule TodolistWeb.TodoLive do
     {:noreply, assign(socket, :todos, Todos.list_todos())}
   end
 
+  defp replace_todo(todos, updated_todo) do
+    Enum.map(todos, fn todo ->
+      if todo.id == updated_todo.id, do: updated_todo, else: todo
+    end)
+  end
+
   defp broadcast_todos_changed do
-    Phoenix.PubSub.broadcast(Todolist.PubSub, @todos_topic, :todos_changed)
+    Phoenix.PubSub.broadcast_from(Todolist.PubSub, self(), @todos_topic, :todos_changed)
   end
 
   def render(assigns) do
@@ -79,7 +88,11 @@ defmodule TodolistWeb.TodoLive do
               placeholder="할 일을 입력하세요. 추가하면 꼭 해내세요."
             />
 
-            <button type="submit" id="todo-submit" class="w-full rounded border px-3 py-2">
+            <button
+              type="submit"
+              id="todo-submit"
+              class="w-full rounded border px-3 py-2 transition-opacity phx-submit-loading:cursor-not-allowed phx-submit-loading:pointer-events-none phx-submit-loading:opacity-50"
+            >
               추가
             </button>
           </.form>
@@ -102,7 +115,7 @@ defmodule TodolistWeb.TodoLive do
                     type="button"
                     phx-click="toggle"
                     phx-value-id={todo.id}
-                    class="rounded border px-2 py-1 text-xs"
+                    class="rounded border px-2 py-1 text-xs transition-opacity phx-click-loading:cursor-not-allowed phx-click-loading:pointer-events-none phx-click-loading:opacity-50"
                   >
                     {if todo.done, do: "되돌리기", else: "완료"}
                   </button>
@@ -111,7 +124,7 @@ defmodule TodolistWeb.TodoLive do
                     type="button"
                     phx-click="delete"
                     phx-value-id={todo.id}
-                    class="rounded border px-2 py-1 text-xs"
+                    class="rounded border px-2 py-1 text-xs transition-opacity phx-click-loading:cursor-not-allowed phx-click-loading:pointer-events-none phx-click-loading:opacity-50"
                   >
                     삭제
                   </button>
