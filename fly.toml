@@ -1,8 +1,3 @@
-# fly.toml app configuration file generated for phx-todolist on 2026-03-25T16:03:58Z
-#
-# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
-#
-
 app = 'phx-todolist'
 primary_region = 'nrt'
 kill_signal = 'SIGTERM'
@@ -21,7 +16,7 @@ kill_signal = 'SIGTERM'
   force_https = true
   auto_stop_machines = 'suspend'
   auto_start_machines = true
-  min_machines_running = 1
+  min_machines_running = 0
   processes = ['app']
 
   [http_service.concurrency]
@@ -30,7 +25,6 @@ kill_signal = 'SIGTERM'
     soft_limit = 1000
 
 [[vm]]
-  memory = '1gb'
-  cpu_kind = 'shared'
+  cpu_kind = "shared"
   cpus = 1
-  memory_mb = 1024
+  memory = "256mb"
